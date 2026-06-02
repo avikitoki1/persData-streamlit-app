@@ -91,7 +91,20 @@ if st.button("▶️ Run Driver Analysis", type="primary"):
         # ── PREPARE DATA ──────────────────────────────────────────────────────
         feature_cols = [FEATURE_COLS[f] for f in selected_features]
         model_df = df[[TARGET] + feature_cols].copy()
+        # Filter out unknown values ← add here
+        EXCLUDE = ["Unknown", "Not applicable", "Unanswered",
+                "Not known", "Nonclassified", "Don't know",
+                "Not assigned", "nan"]
 
+        for col in feature_cols:
+            if model_df[col].dtype == object:
+                model_df = model_df[~model_df[col].isin(EXCLUDE)]
+
+        # Convert target to numeric
+        model_df[TARGET] = pd.to_numeric(model_df[TARGET], errors="coerce")
+        model_df = model_df.dropna(subset=[TARGET])
+        model_df = model_df[model_df[TARGET].isin([0, 1])]
+        model_df[TARGET] = model_df[TARGET].astype(int)
         # Convert target to numeric
         model_df[TARGET] = pd.to_numeric(model_df[TARGET], errors="coerce")
         model_df = model_df.dropna(subset=[TARGET])
@@ -150,7 +163,12 @@ if st.button("▶️ Run Driver Analysis", type="primary"):
         # ── RANDOM FOREST ─────────────────────────────────────────────────────
         # n_estimators=100 — build 100 decision trees
         # random_state=42 — reproducible results
-        rf = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+        rf = RandomForestClassifier(
+            n_estimators=100, 
+            random_state=42, 
+            n_jobs=-1,
+            class_weight="balanced"  # corrects for 70/30 imbalance
+        )
         rf.fit(X_rf_train, y_train)
 
         importance_df = pd.DataFrame({
@@ -163,7 +181,12 @@ if st.button("▶️ Run Driver Analysis", type="primary"):
         # ── LOGISTIC REGRESSION ───────────────────────────────────────────────
         # max_iter=1000 — allow enough iterations for convergence
         # C=1.0 (default) — regularisation strength
-        lr = LogisticRegression(max_iter=1000, random_state=42, C=1.0)
+        lr = LogisticRegression(
+            max_iter=1000, 
+            random_state=42, 
+            C=1.0,
+            class_weight="balanced"  # corrects for 70/30 imbalance
+        )
         lr.fit(X_lr_train, y_train)
 
         # Odds ratio = e^coefficient
